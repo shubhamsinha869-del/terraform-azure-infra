@@ -21,12 +21,12 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
-        working-directory: parent/preprod
+        working-directory: ./parent/preprod
 
       - name: Terraform Validate
         run: terraform validate
-        working-directory: parent/preprod
+        working-directory: ./parent/preprod
 
       - name: Terraform Plan
         run: terraform plan
-        working-directory: parent/preprod
+        working-directory: ./parent/preprod

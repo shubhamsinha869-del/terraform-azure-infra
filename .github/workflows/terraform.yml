@@ -1,0 +1,32 @@
+name: Terraform CI
+
+on:
+  push:
+    branches:
+      - feature/terraform-infra
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: parent/preprod
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: parent/preprod
+
+      - name: Terraform Plan
+        run: terraform plan
+        working-directory: parent/preprod

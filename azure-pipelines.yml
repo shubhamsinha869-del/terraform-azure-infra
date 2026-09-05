@@ -6,30 +6,126 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
-steps:
+variables:
+  terraformVersion: '1.13.5'
+  terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)/parent/preprod'
 
-- task: TerraformInstaller@1
-  displayName: Install Terraform
-  inputs:
-    terraformVersion: 'latest'
+stages:
 
-- task: TerraformTaskV4@4
-  displayName: Terraform Init
-  inputs:
-    provider: azurerm
-    command: init
-    workingDirectory: '$(System.DefaultWorkingDirectory)/parent/preprod'
+# =========================================================
+# CI STAGE
+# =========================================================
+- stage: CI
+  displayName: 'Terraform CI'
 
-- task: TerraformTaskV4@4
-  displayName: Terraform Validate
-  inputs:
-    provider: azurerm
-    command: validate
-    workingDirectory: '$(System.DefaultWorkingDirectory)/parent/preprod'
+  jobs:
+  - job: TerraformValidation
+    displayName: 'Terraform Validation'
 
-- task: TerraformTaskV4@4
-  displayName: Terraform Plan
-  inputs:
-    provider: azurerm
-    command: plan
-    workingDirectory: '$(System.DefaultWorkingDirectory)/parent/preprod'
+    steps:
+
+    # 1. Install Terraform
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: '$(terraformVersion)'
+
+    # 2. Check Terraform version
+    - script: |
+        terraform version
+      displayName: 'Check Terraform Version'
+
+    # 3. Terraform Init
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(terraformWorkingDirectory)'
+
+    # 4. Terraform Format
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Format Check'
+      inputs:
+        provider: 'azurerm'
+        command: 'custom'
+        workingDirectory: '$(terraformWorkingDirectory)'
+        commandOptions: 'fmt -check'
+
+    # 5. Terraform Validate
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Validate'
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(terraformWorkingDirectory)'
+
+    # 6. Terraform Plan
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(terraformWorkingDirectory)'
+        commandOptions: '-out=tfplan'
+        environmentServiceNameAzureRM: 'YOUR-AZURE-SERVICE-CONNECTION'
+
+    # 7. Publish Terraform Plan
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Terraform Plan'
+      inputs:
+        targetPath: '$(terraformWorkingDirectory)/tfplan'
+        artifact: 'terraform-plan'
+
+
+# =========================================================
+# CD STAGE
+# =========================================================
+- stage: CD
+  displayName: 'Terraform CD'
+  dependsOn: CI
+  condition: succeeded()
+
+  jobs:
+
+  - deployment: DeployToDev
+    displayName: 'Deploy Terraform to DEV'
+
+    environment: 'dev'
+
+    strategy:
+      runOnce:
+        deploy:
+
+          steps:
+
+          # Install Terraform again on deployment agent
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: '$(terraformVersion)'
+
+          # Download plan artifact
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download Terraform Plan'
+            inputs:
+              artifact: 'terraform-plan'
+              path: '$(terraformWorkingDirectory)'
+
+          # Terraform Init
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(terraformWorkingDirectory)'
+
+          # Terraform Apply
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Apply'
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              workingDirectory: '$(terraformWorkingDirectory)'
+              commandOptions: 'tfplan'
+              environmentServiceNameAzureRM: 'YOUR-AZURE-SERVICE-CONNECTION'

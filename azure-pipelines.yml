@@ -68,7 +68,7 @@ stages:
         command: 'plan'
         workingDirectory: '$(terraformWorkingDirectory)'
         commandOptions: '-out=tfplan'
-        environmentServiceNameAzureRM: 'YOUR-AZURE-SERVICE-CONNECTION'
+        environmentServiceNameAzureRM: 'azure-shubham-connection'
 
     # 7. Publish Terraform Plan
     - task: PublishPipelineArtifact@1
@@ -128,4 +128,4 @@ stages:
               command: 'apply'
               workingDirectory: '$(terraformWorkingDirectory)'
               commandOptions: 'tfplan'
-              environmentServiceNameAzureRM: 'YOUR-AZURE-SERVICE-CONNECTION'
+              environmentServiceNameAzureRM: 'azure-shubham-connection'
